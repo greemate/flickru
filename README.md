@@ -24,6 +24,10 @@
 프로그램 종료하지 않고 계속 실행 (daemon mode)
 
     python3 flickru.py -k <api_key> -s <secret_key> -d /path/from --remove_photo --daemon
+    
+사진 업로드 및 디렉토리 이름으로 앨범 생성 후 사진 포함 (아래 예에서는 party라는 앨범 생성)
+
+    python3 flickru.py -k <api_key> -s <secret_key> -d /path/party -A
 
 
 ## 기타 옵션

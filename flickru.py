@@ -88,6 +88,7 @@ def _init_args():
     parser.add_argument('-e', '--description', action='store', metavar='<주석>', help='사진 주석', default='')
     parser.add_argument('-r', '--remove_photo', action='store_true', help='업로드 후 사진 삭제')
     parser.add_argument('-D', '--daemon', action='store_true', help='종료하지 않고 계속 실행')
+    parser.add_argument('-A', '--album_dir', action='store_true', help='사진을 포함한 디렉토리 이름으로 앨범 생성후 업로드')
 
     parser.set_defaults(**defaults)
     OPT = parser.parse_args()
@@ -169,6 +170,10 @@ def _init_flickr_auth():
 def md5_checksum(filespec):
     return hashlib.md5(open(filespec, 'rb').read()).hexdigest()
 
+def get_dirname(path):
+    dirpath = os.path.split(path)[0]
+    dirname = dirpath.split(os.sep)[-1]
+    return dirname
 
 def grab_new_photos(path):
     photos = []
@@ -178,9 +183,10 @@ def grab_new_photos(path):
             if file.split('.')[-1].lower() in UPLOAD_EXT:
                 fullpath = os.path.join(root, file)
                 md5 = md5_checksum(fullpath)
-                history = session.query(UploadHistory).filter(UploadHistory.md5 == md5).first() 
+                dirname = get_dirname(fullpath)
+                history = session.query(UploadHistory).filter(UploadHistory.md5 == md5).first()
                 if not history:
-                    photos.append({'path': fullpath, 'md5': md5})
+                    photos.append({'path': fullpath, 'md5': md5, 'dirname' : dirname})
                 elif OPT.remove_photo:
                     os.remove(fullpath)
                     LOGGER.info('<{}>는 이미 업로드한 사진이라 삭제합니다. 사진번호: {}'.format(fullpath, history.photo_id))
@@ -202,7 +208,7 @@ def file_is_in_changing(file):
 
 
 def add_to_album(album_name, photo_id):
-    if 'album_id' in OPT:
+    if 'album_id' in OPT and OPT.album_name == album_name :
         rsp = FLICKR.photosets.addPhoto(api_key=OPT.api_key, photoset_id=OPT.album_id, photo_id=photo_id)
     else:
         rsp = FLICKR.photosets.getList(user_id=OPT.user_id)
@@ -210,12 +216,14 @@ def add_to_album(album_name, photo_id):
         for album in rsp.find('photosets').findall('photoset'):
             if album.findtext('title') == album_name:
                 OPT.album_id = album.attrib['id']
+                OPT.album_name = album_name
                 break
-        if 'album_id' in OPT:
+        if 'album_id' in OPT and OPT.album_name == album_name :
             rsp = FLICKR.photosets.addPhoto(api_key=OPT.api_key, photoset_id=OPT.album_id, photo_id=photo_id)
         else:
             rsp = FLICKR.photosets.create(api_key=OPT.api_key, title=album_name, primary_photo_id=photo_id)
             OPT.album_id = rsp.find('photoset').attrib['id']
+            OPT.album_name = album_name
 
 
 def upload_photo(photos, title, tag, description, remove_photo):
@@ -234,6 +242,8 @@ def upload_photo(photos, title, tag, description, remove_photo):
 
         if OPT.album:
             add_to_album(OPT.album, photo_id)
+        elif OPT.album_dir:
+            add_to_album(photo['dirname'], photo_id)
 
         msg = '업로드 완료'
         if remove_photo:
