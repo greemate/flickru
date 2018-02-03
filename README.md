@@ -29,6 +29,10 @@
 
     python3 flickru.py -k <api_key> -s <secret_key> -d /path/party -A
 
+플리커 API에서 예외 발생시 업로드 재시도 횟수 지정 (아래 예에서는 3회 재시도)
+
+    python3 flickru.py -k <api_key> -s <secret_key> -d /path/party -A -c 3
+
 
 ## 기타 옵션
 

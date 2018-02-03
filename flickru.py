@@ -32,10 +32,12 @@ FLICKR = None
 Base = declarative_base()
 session = None
 
-SLEEP_TIME = 60 * 5
-DRIP_TIME = 60 * 1
+SLEEP_TIME = 30 # 60 * 5
+DRIP_TIME = 30 # 60 * 1
 UPLOAD_EXT = ['jpg', 'jpeg', 'png', 'gif', 'avi', 'mov', 'mpg', 'mp4', '3gp']
 EXCLUDE_SUBDIR = ['@eaDir', '#recycle', '_ExcludeSync', 'Originals']
+
+FIRST_COUNT = 1
 
 
 class UploadHistory(Base):
@@ -89,6 +91,7 @@ def _init_args():
     parser.add_argument('-r', '--remove_photo', action='store_true', help='업로드 후 사진 삭제')
     parser.add_argument('-D', '--daemon', action='store_true', help='종료하지 않고 계속 실행')
     parser.add_argument('-A', '--album_dir', action='store_true', help='사진을 포함한 디렉토리 이름으로 앨범 생성후 업로드')
+    parser.add_argument('-c', '--retry_count', action='store', metavar='<재시도카운트>', type=int, default=0, help='업로드 예외 발생시 재시도 횟수')
 
     parser.set_defaults(**defaults)
     OPT = parser.parse_args()
@@ -237,7 +240,15 @@ def upload_photo(photos, title, tag, description, remove_photo):
         ttl = title if title else os.path.splitext(os.path.basename(photo['path']))[0]
         LOGGER.debug('FLICKR.upload(filename={}, title={}, tags={}, description={})'.format(photo['path'], ttl, tag,
                                                                                             dsc))
-        rsp = FLICKR.upload(filename=photo['path'], title=ttl, tags=tag, description=dsc, is_public='0')
+        for retry_count in range(FIRST_COUNT + OPT.retry_count):
+            try:
+                rsp = FLICKR.upload(filename=photo['path'], title=ttl, tags=tag, description=dsc, is_public='0')
+                break
+            except Exception as e:
+                LOGGER.info('FLICKR.upload 시도 {} 번째에 예외 발생'.format(FIRST_COUNT + retry_count))
+                LOGGER.info(e)
+                continue
+
         photo_id = rsp.findtext('photoid')
 
         if OPT.album:
